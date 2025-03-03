@@ -1,0 +1,47 @@
+---
+title: "github_command"
+author: "Kira Liu"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Basic Github Push Usage
+```{bash}
+# Create a new branch for a feature
+git checkout -b feature/new-analysis
+
+# Work on your feature...
+# Then commit changes
+git add .
+git commit -m "Add differential expression analysis"
+
+# Push the branch to GitHub
+git push -u origin feature/new-analysis
+
+# When ready, merge via Pull Request on GitHub
+# or merge locally:
+git checkout main
+git merge feature/new-analysis
+```
+
+
+# Day-to-Day GitHub Workflow for Bioinformatics
+```{bash}
+# Start your day by pulling latest changes
+git pull origin main
+
+# Work on your analysis scripts and functions and Commit changes frequently
+git add scripts/03_differential_analysis.R
+git commit -m "Implement DESeq2 analysis for RNA-seq data"
+
+# Push changes at the end of your session
+git push origin main
+
+# For major changes, consider using branches:This keeps your main code stable while you experiment
+```
+
+

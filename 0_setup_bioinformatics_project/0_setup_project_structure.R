@@ -15,11 +15,10 @@ create_bioinfo_structure <- function() {
     "data/raw",             # Original immutable data
     "data/processed",       # Processed data files
     "data/metadata",        # Sample information files
-    "functions",            # R functions
-    "scripts",              # Analysis scripts
+    "scripts/functions",    # Analysis scripts and R functions
     "results/figures",      # Generated figures
     "results/tables",       # Generated data tables
-    "doc",                  # Documentation
+    "doc/reference",        # Documentation and Reference
     "config",               # Configuration files
     "logs",                 # Log files
     "reports",              # Reports files

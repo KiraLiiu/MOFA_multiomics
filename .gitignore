@@ -1,0 +1,31 @@
+# R specific files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# Raw data (often large and shouldn't be version controlled)
+data/raw/*
+!data/raw/.gitkeep
+
+# Large processed data
+*.RDS
+*.rds
+*.RData
+*.Rdata
+
+# Common bioinformatics file formats
+*.bam
+*.sam
+*.fastq
+*.fq
+*.fastq.gz
+*.fq.gz
+*.vcf
+*.vcf.gz
+*.bcf
+
+# Log files
+logs/*
+!logs/.gitkeep

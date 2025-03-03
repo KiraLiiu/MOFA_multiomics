@@ -1,0 +1,20 @@
+project:
+  name: MOFA
+  description: A bioinformatics analysis project
+  version: 0.1.0
+  date_created: '2025-03-03'
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  metadata: data/metadata
+  results: results
+  logs: logs
+parameters:
+  threads: 4.0
+  memory: 8G
+  seed: 42.0
+  p_value_cutoff: 0.05
+references:
+  species: human
+  genome: hg38
+  annotation: gencode.v38

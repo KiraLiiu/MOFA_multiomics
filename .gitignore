@@ -7,6 +7,8 @@
 
 # Raw data (often large and shouldn't be version controlled)
 data/raw/*
+data/processed/*
+data/metadata/*
 !data/raw/.gitkeep
 
 # Large processed data

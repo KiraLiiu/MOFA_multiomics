@@ -22,10 +22,14 @@ git commit -m "Add differential expression analysis"
 # Push the branch to GitHub
 git push -u origin feature/new-analysis
 
-# When ready, merge via Pull Request on GitHub
+# When ready, merge via Pull Request on GitHub (git pull origin main)
 # or merge locally:
 git checkout main
 git merge feature/new-analysis
+
+# Check the current state of your working directory
+git status
+
 ```
 
 
@@ -35,13 +39,11 @@ git merge feature/new-analysis
 git pull origin main
 
 # Work on your analysis scripts and functions and Commit changes frequently
-git add scripts/03_differential_analysis.R
-git commit -m "Implement DESeq2 analysis for RNA-seq data"
+git add scripts/03_differential_analysis.R # if everything: git add .
+git commit -m "Implement DESeq2 analysis for RNA-seq data" # a update message
 
 # Push changes at the end of your session
 git push origin main
 
 # For major changes, consider using branches:This keeps your main code stable while you experiment
 ```
-
-

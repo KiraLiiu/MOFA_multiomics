@@ -1,74 +1,5 @@
-library(MOFA2)
-library(MOFAdata)
-library(data.table)
-library(ggplot2)
-library(tidyverse)
-library(openxlsx)
-library(ggpubr) # involve ggline
+MOFAobject <- load_model("./results/MOFA_multi-omics.hdf5")
 
-
-#######################
-# Create MOFA object ##
-#######################
-
-MOFAobject <- create_mofa(MOFA_yoyo_data)
-
-# Visualise data structure
-plot_data_overview(MOFAobject)
-
-
-# # Multi-Group
-# N = ncol(data[[1]])
-# groups = c(rep("Yo-yo Diet",26), rep("Western Diet", 13))
-# groups = c(rep("During",21), rep("After", 18))
-# MOFAobject <- create_mofa(MOFA_yoyo_data, groups=groups)
-
-
-####################
-## Define options ##
-####################
-
-# Data options
-# - scale_views: if views have very different ranges/variances, it is good practice to scale each view to unit variance (default is FALSE)
-data_opts <- get_default_data_options(MOFAobject)
-
-data_opts
-
-# Model options
-# - likelihoods: likelihood per view (options are "gaussian","poisson","bernoulli"). "gaussian" is used by default
-# - num_factors: number of factors. By default K=10
-model_opts <- get_default_model_options(MOFAobject)
-model_opts$num_factors <- 9
-model_opts
-
-# Training options
-# - maxiter: number of iterations
-# - convergence_mode: "fast", "medium", "slow". For exploration, the fast mode is good enough.
-# - drop_factor_threshold: minimum variance explained criteria to drop factors while training. Default is -1 (no dropping of factors)
-# - gpu_mode: use GPU mode? This needs cupy installed and a functional GPU, see https://biofam.github.io/MOFA2/gpu_training.html
-# - seed: random seed
-train_opts <- get_default_training_options(MOFAobject)
-train_opts$convergence_mode <- "slow"
-train_opts$seed <- 42
-
-train_opts
-
-#########################
-## Prepare MOFA object ##
-#########################
-
-MOFAobject <- prepare_mofa(MOFAobject,
-                           data_options = data_opts,
-                           model_options = model_opts,
-                           training_options = train_opts
-)
-
-##############################
-## Train and Save the model ##
-##############################
-
-MOFAobject <- run_mofa(MOFAobject, outfile="./results/MOFA_yoyo_RNA+PTM++Metabolite.hdf5")
-saveRDS(MOFAobject,"./results/MOFA_yoyo_RNA+PTM+Metabolites_splited.rds")
 
 # # need to configure the environment and add mofapy2
 # reticulate::py_config()
@@ -77,7 +8,7 @@ saveRDS(MOFAobject,"./results/MOFA_yoyo_RNA+PTM+Metabolites_splited.rds")
 
 plot_factor_cor(MOFAobject)
 
-plot_variance_explained(MOFAobject, max_r2=15)
+plot_variance_explained(MOFAobject, max_r2=25)
 
 plot_variance_explained(MOFAobject, plot_total = T)[[2]]
 
@@ -107,28 +38,9 @@ ggline(r2.dt, x="factor", y="cum_r2", color="view") +
 
 
 # load metadata for the data frame (like: phenotype or health records) 
-MOFA_yoyo_metadata <- read.xlsx("./data/data_yoyo.xlsx", sheet = 6)
+library(openxlsx)
+MOFA_yoyo_metadata <- read.xlsx("./data/raw/data_yoyo.xlsx", sheet = 6)
 samples_metadata(MOFAobject) <- MOFA_yoyo_metadata
-
-
-category.colors <- c(
-  "Healthy, no antibiotics" = "#66C2A5", 
-  "Healthy, antibiotics" = "#8DA0CB",
-  "Sepsis" = "#E78AC3",
-  "Non septic ICU" = "#FC8D62"
-)
-
-p <- plot_factors(MOFAobject, 
-                  factors = c(1,3), 
-                  color_by = "Timepoint", 
-                  dot_size = 4
-                  ) + scale_fill_manual(values=category.colors)
-
-p + 
-  # geom_density_2d(aes_string(color="color_by")) +
-  stat_ellipse(aes(color=color_by), geom = "polygon", alpha=0.25) +
-  scale_color_manual(values=category.colors)
-
 
 
 # load required packages
@@ -223,37 +135,37 @@ plot_factor(MOFAobject,
 
 plot_weights(MOFAobject,
              view = "metabolite",
-             factor = 5,
+             factor = 1,
              nfeatures = 10,     # Top number of features to highlight
              scale = T           # Scale weights from -1 to 1
 )
 
 plot_top_weights(MOFAobject,
              view = "ptm",
-             factor = 5,
+             factor = 2,
              nfeatures = 10,     # Top number of features to highlight
              scale = T           # Scale weights from -1 to 1
 )
 
 plot_top_weights(MOFAobject,
                  view = "rna",
-                 factor = 5,
+                 factor = 1,
                  nfeatures = 10,     # Top number of features to highlight
                  scale = T           # Scale weights from -1 to 1
 )
 
 
 plot_weights(MOFAobject,
-             view = "metabolites",
-             factor = 2,
+             view = "metabolite",
+             factor = 1,
              nfeatures = 10,     # Top number of features to highlight
              scale = T           # Scale weights from -1 to 1
 )
 
 plot_top_weights(MOFAobject,
-             view = "metabolites",
-             factor = 2,
-             nfeatures = 10,     # Top number of features to highlight
+             view = "metabolite",
+             factor = 1,
+             nfeatures = 20,     # Top number of features to highlight
              scale = T           # Scale weights from -1 to 1
 )
 
@@ -298,48 +210,24 @@ head(data_df)
 write.xlsx(data_df, "./results/MOFA_multi_omics_results/MOFA_data.xlsx")
 
 
-# Get feature weights for Factor 3
-factor5_weights <- subset(weights_df, factor == "Factor5")
-unique(factor5_weights$view)
+# Function to extract top features for each factor
 
-write.xlsx(factor5_weights, "./results/MOFA_multi_omics_results/Factor5_all_features.xlsx")
+# Load the function from the script
+source("./scripts/functions/MOFA_analysis_function.R")
 
-# Get top 10 features (genes/metabolites) contributing most to Factor 3
-factor5_top_features <- factor5_weights[order(-abs(factor5_weights$value)), ][1:1000, ]
-print(factor5_top_features)
+# load required packages
+library(openxlsx)
 
-write.xlsx(factor5_top_features, "./results/MOFA_multi_omics_results/Factor5_top_features.xlsx")
+# Save the results to a directory (create if it doesn't exist)
+dir.create("./results/MOFA_multiomics_results", showWarnings = FALSE)
+output_dir <- "./results/MOFA_multiomics_results"
+# Run function for Factors 1-9
 
-
-
-
-# Get feature weights for Factor 1
-factor1_weights <- subset(weights_df, factor == "Factor1")
-unique(factor6_weights$view)
-
-write.xlsx(factor1_weights, "./results/MOFA_multi_omics_results/Factor1_all_features.xlsx")
-
-# Get top 10 features (genes/metabolites) contributing most to Factor 3
-factor1_top_features <- factor1_weights[order(-abs(factor1_weights$value)), ][1:1000, ]
-print(factor1_top_features)
-
-write.xlsx(factor1_top_features, "./results/MOFA_multi_omics_results/Factor1_top_features.xlsx")
-
-
-
-# Get feature weights for Factor 1
-factor6_weights <- subset(weights_df, factor == "Factor6")
-unique(factor6_weights$view)
-
-write.xlsx(factor6_weights, "./results/MOFA_multi_omics_results/Factor6_all_features.xlsx")
-
-# Get top 10 features (genes/metabolites) contributing most to Factor 6
-factor6_top_features <- factor6_weights[order(-abs(factor6_weights$value)), ][1:1000, ]
-print(factor6_top_features)
-
-write.xlsx(factor6_top_features, "./results/MOFA_multi_omics_results/Factor6_top_features.xlsx")
-
-
+mofa_results <- extract_top_features(weights_df, 
+                                     factor_column = "factor", value_column = "value", 
+                                     factors = 1:9, 
+                                     output_dir = output_dir, 
+                                     top_n = 1000)
 
 # 
 # 

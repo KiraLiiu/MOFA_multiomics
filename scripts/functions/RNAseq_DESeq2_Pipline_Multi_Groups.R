@@ -21,7 +21,7 @@ library(DESeq2)
 library(AnnotationDbi)
 library(pheatmap)
 library(tidyr)
-library(org.Mm.eg.db)  # or org.Hs.eg.db for human data
+# library(org.Mm.eg.db)  # or org.Hs.eg.db for human data
 
 #' Create condition table for multiple groups
 #' @param sample_info Sample metadata dataframe
@@ -101,7 +101,6 @@ validate_groups <- function(condition_table, groups, comparisons) {
   return(valid_comparisons)
 }
 
-
 #' Prepare count matrix for DESeq2
 #' @param count_matrix Raw count matrix
 #' @param condition_table Condition table with sample IDs
@@ -118,7 +117,7 @@ prepare_count_matrix <- function(count_matrix, condition_table, min_count = 10) 
     mutate(across(everything(), as.integer))
   
   # Filter low-count genes
-  keep_genes <- rowSums(filtered_matrix) > min_count
+  keep_genes <- rowMeans(filtered_matrix) > min_count
   filtered_matrix <- filtered_matrix[keep_genes, ]
   
   return(filtered_matrix)
@@ -130,26 +129,45 @@ prepare_count_matrix <- function(count_matrix, condition_table, min_count = 10) 
 #' @param comparisons List of pairwise comparisons
 #' @param independent_filtering Logical, whether to perform independent filtering
 #' @return DESeq2 results object
-run_deseq2_analysis <- function(count_matrix, condition_table, comparisons, 
+run_deseq2_analysis <- function(count_matrix, 
+                                condition_table, 
+                                comparisons, 
                                 independent_filtering = TRUE) {
-  # Create and run DESeq2 object for all groups
+  # Create DESeq2 object
   dds <- DESeqDataSetFromMatrix(
     countData = count_matrix,
     colData = condition_table,
     design = ~ condition
   )
   
-  # Run DESeq2 once for global normalization
-  dds <- DESeq(dds)
+  # Run DESeq2
+  tryCatch({
+    dds <- DESeq(dds)
+  }, error = function(e) {
+    if (grepl("the model matrix is not full rank", e$message)) {
+      # Get actual sample counts
+      sample_counts <- table(condition_table$condition)
+      stop("DESeq2 analysis failed due to insufficient samples.\n",
+           "Sample counts per group:\n",
+           paste(capture.output(print(sample_counts)), collapse="\n"), "\n",
+           "Each group should have at least 2 samples.")
+    } else {
+      stop(e)
+    }
+  })
   
   # Get results for each comparison
   results_list <- list()
   for (comp in comparisons) {
-    results_list[[paste(comp[1], "vs", comp[2])]] <- results(
-      dds,
-      contrast = c("condition", comp[1], comp[2]),
-      independentFiltering = independent_filtering
-    )
+    tryCatch({
+      results_list[[paste(comp[1], "vs", comp[2])]] <- results(
+        dds,
+        contrast = c("condition", comp[1], comp[2]),
+        independentFiltering = independent_filtering
+      )
+    }, error = function(e) {
+      warning("Failed to get results for comparison ", comp[1], " vs ", comp[2], ": ", e$message)
+    })
   }
   
   # Calculate normalized counts
@@ -161,8 +179,6 @@ run_deseq2_analysis <- function(count_matrix, condition_table, comparisons,
     vsd = vsd
   ))
 }
-
-
 
 #' Get available organism databases
 #' @return Character vector of available organism databases
@@ -193,9 +209,6 @@ load_organism_db <- function(organism) {
     return(organism)
   }
 }
-
-
-
 
 #' Annotate DESeq2 results for multiple comparisons
 #' @param deseq_results Results from run_deseq2_analysis
@@ -296,7 +309,6 @@ annotate_results <- function(deseq_results,
   return(annotated_results)
 }
 
-
 #' Generate PCA plot for a subset of samples
 #' @param vst_counts VST-transformed count data
 #' @param conditions Sample conditions
@@ -351,9 +363,7 @@ create_pca_plot <- function(vst_counts, conditions, title) {
     )
 }
 
-
-
-#' Generate visualization plots for multiple groups with subgroup analysis
+#' Generate essential visualization plots for multiple groups
 #' @param deseq_results Results from run_deseq2_analysis
 #' @param output_dir Directory for saving plots
 #' @param comparisons List of pairwise comparisons
@@ -364,7 +374,6 @@ generate_plots <- function(deseq_results, output_dir = "plots", comparisons, wid
   
   # Get all samples and conditions
   sample_data <- colData(deseq_results$dds)
-  all_groups <- levels(sample_data$condition)
   
   # 1. MA plots for each comparison
   for (comparison_name in names(deseq_results$results)) {
@@ -398,7 +407,7 @@ generate_plots <- function(deseq_results, output_dir = "plots", comparisons, wid
           ggtitle("Global PCA Plot"))
   dev.off()
   
-  # 3. Pairwise comparison plots
+  # 3. Pairwise comparison PCA plots
   for (comp in comparisons) {
     group1 <- comp[1]
     group2 <- comp[2]
@@ -441,108 +450,8 @@ generate_plots <- function(deseq_results, output_dir = "plots", comparisons, wid
              annotation_col = data.frame(Condition = subset_conditions,
                                          row.names = colnames(vst_counts)))
     dev.off()
-    
-    # Pairwise correlation heatmap
-    cor_matrix <- cor(vst_counts_filtered)
-    pdf(file.path(output_dir, paste0("correlation_", group1, "_vs_", group2, ".pdf")), 
-        width = width, height = height)
-    pheatmap(cor_matrix,
-             main = paste("Sample Correlation:", group1, "vs", group2),
-             annotation_col = data.frame(Condition = subset_conditions,
-                                         row.names = colnames(vst_counts)))
-    dev.off()
   }
-  
-  # 4. Group-specific correlation heatmaps
-  for (group in all_groups) {
-    idx <- sample_data$condition == group
-    if (sum(idx) < 2) next
-    
-    group_data <- vst_assay[top_var_genes, idx]
-    cor_matrix <- cor(group_data, method = "pearson")
-    
-    pdf(file.path(output_dir, paste0("correlation_heatmap_", group, ".pdf")), 
-        width = width, height = height)
-    pheatmap(cor_matrix,
-             main = paste("Sample Correlation Heatmap:", group),
-             display_numbers = TRUE,
-             number_format = "%.2f",
-             fontsize_number = 8)
-    dev.off()
-  }
-  
-  # 5. Global sample correlation heatmap
-  sample_cor <- cor(vst_assay[top_var_genes,])
-  pdf(file.path(output_dir, "global_correlation_heatmap.pdf"), 
-      width = width, height = height)
-  pheatmap(sample_cor,
-           main = "Global Sample Correlation Heatmap",
-           annotation_col = data.frame(Condition = sample_data$condition,
-                                       row.names = rownames(sample_data)),
-           annotation_row = data.frame(Condition = sample_data$condition,
-                                       row.names = rownames(sample_data)))
-  dev.off()
 }
-
-
-#' Run DESeq2 analysis with multiple groups (updated with validation)
-#' @param count_matrix Filtered count matrix
-#' @param condition_table Condition table
-#' @param comparisons List of pairwise comparisons
-#' @param independent_filtering Logical, whether to perform independent filtering
-#' @return DESeq2 results object
-run_deseq2_analysis <- function(count_matrix, 
-                                condition_table, 
-                                comparisons, 
-                                independent_filtering = TRUE) {
-  # Create DESeq2 object
-  dds <- DESeqDataSetFromMatrix(
-    countData = count_matrix,
-    colData = condition_table,
-    design = ~ condition
-  )
-  
-  # Run DESeq2
-  tryCatch({
-    dds <- DESeq(dds)
-  }, error = function(e) {
-    if (grepl("the model matrix is not full rank", e$message)) {
-      # Get actual sample counts
-      sample_counts <- table(condition_table$condition)
-      stop("DESeq2 analysis failed due to insufficient samples.\n",
-           "Sample counts per group:\n",
-           paste(capture.output(print(sample_counts)), collapse="\n"), "\n",
-           "Each group should have at least 2 samples.")
-    } else {
-      stop(e)
-    }
-  })
-  
-  # Get results for each comparison
-  results_list <- list()
-  for (comp in comparisons) {
-    tryCatch({
-      results_list[[paste(comp[1], "vs", comp[2])]] <- results(
-        dds,
-        contrast = c("condition", comp[1], comp[2]),
-        independentFiltering = independent_filtering
-      )
-    }, error = function(e) {
-      warning("Failed to get results for comparison ", comp[1], " vs ", comp[2], ": ", e$message)
-    })
-  }
-  
-  # Calculate normalized counts
-  vsd <- vst(dds, blind = FALSE)
-  
-  return(list(
-    dds = dds,
-    results = results_list,
-    vsd = vsd
-  ))
-}
-
-
 
 #' Extract raw DESeq2 results and normalized counts
 #' @param deseq_results Results from DESeq2 analysis
@@ -586,7 +495,6 @@ get_raw_results <- function(deseq_results, output_dir) {
   ))
 }
 
-
 #' Main RNA-seq analysis function with annotation
 #' @param count_matrix Pre-loaded count matrix
 #' @param sample_info Pre-loaded sample information
@@ -618,7 +526,8 @@ analyze_rnaseq_multi <- function(count_matrix,
                                  remove_duplicates = TRUE,
                                  remove_na_symbol = TRUE,
                                  duplicate_agg = NULL,
-                                 report_stats = TRUE) {
+                                 report_stats = TRUE,
+                                 save_tables = TRUE) {
   
   # Create condition table for all groups
   condition_table <- create_condition_table(
@@ -666,21 +575,43 @@ analyze_rnaseq_multi <- function(count_matrix,
     comparisons = valid_comparisons
   )
   
-  # Save results
-  message("\nSaving results...")
-  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-  for (comparison_name in names(annotated_results)) {
-    write.csv(
-      annotated_results[[comparison_name]],
-      file = file.path(output_dir, paste0("DESeq2_", comparison_name, "_results.csv")),
-      row.names = FALSE
+  # # Save results
+  # message("\nSaving results...")
+  # dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+  # for (comparison_name in names(annotated_results)) {
+  #   write.csv(
+  #     annotated_results[[comparison_name]],
+  #     file = file.path(output_dir, paste0("DESeq2_", comparison_name, "_results.csv")),
+  #     row.names = FALSE
+  #   )
+  # }
+  # 
+  # message("\nAnalysis complete!")
+  # return(list(
+  #   deseq_results = deseq_results,
+  #   annotated_results = annotated_results,
+  #   condition_table = condition_table
+  # ))
+  
+  # Get and save raw results
+  message("\nExtracting and saving results...")
+  if (save_tables) {
+    raw_results <- get_raw_results(deseq_results, output_dir)
+  } else {
+    raw_results <- list(
+      raw_results = lapply(deseq_results$results, as.data.frame),
+      vst_counts = as.data.frame(assay(deseq_results$vsd)),
+      size_normalized_counts = as.data.frame(counts(deseq_results$dds, normalized=TRUE))
     )
   }
   
   message("\nAnalysis complete!")
   return(list(
-    deseq_results = deseq_results,
-    annotated_results = annotated_results,
+    deseq_object = deseq_results$dds,
+    vsd_object = deseq_results$vsd,
+    raw_results = raw_results$raw_results,
+    vst_counts = raw_results$vst_counts,
+    size_normalized_counts = raw_results$size_normalized_counts,
     condition_table = condition_table
   ))
 }

@@ -9,7 +9,7 @@ rownames(met_matrix) <- met_matrix$Compound
 met_matrix <- met_matrix[,-c(1:2)]
 met_matrix <- t(met_matrix)
 
-# Standardize sample IDs in data_matrix (Add leading zeros where needed) ？？？？
+# Standardize sample IDs in data_matrix (Add leading zeros where needed)
 # Function to add leading zeros for single-digit numbers
 format_sample_id <- function(id) {
   gsub("^([0-9])([A-Z])", "0\\1\\2", id)  # If a number is a single digit, add a leading zero
@@ -34,17 +34,23 @@ sample_info <- sample_info %>%
 # Define the output directory
 output_dir <- "data/processed/metabolomics_normalized/"
 
-# Run the metabolomics data processing pipeline
-normalized_metabolomics <- process_metabolomics_data(met_matrix = met_matrix, 
+# Run the metabolomics data processing pipeline with methods: "tic_limma", "tic", "glog", "limma", "log2"
+# Choose the method: "glog"
+normalized_metabolomics <- process_metabolomics_data(met_matrix = met_matrix,
                                                      sample_info = sample_info,
                                                      output_dir = output_dir,
-                                                     max_missing_pct = 50,
-                                                     min_abundance = 10,
-                                                     normalization_method = "quantile")
+                                                     normalization_method = "glog",  # Choose method: "tic_limma", "tic", "glog", "limma", "log2"
+                                                     limma_method = "quantile",      # For limma-based methods
+                                                     lambda = 1e-10                  # For glog transformation
+                                                     )
+  
 
-# remove intermediate objects and run garbage collection 
-rm(list = setdiff(ls(), "normalized_metabolomics"))
-gc()  # Run garbage collection to free memory
+write.csv(normalized_metabolomics, file = paste0(output_dir, "metabolomics_normalized.csv"))
+
+metabolomics_normalized <- normalized_metabolomics
+# # remove intermediate objects and run garbage collection 
+# rm(list = setdiff(ls(), "normalized_metabolomics"))
+# gc()  # Run garbage collection to free memory
 
 
 

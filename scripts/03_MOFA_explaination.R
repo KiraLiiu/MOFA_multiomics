@@ -1,5 +1,5 @@
-MOFAobject <- load_model("./results/MOFA_multi-omics.hdf5")
-
+# Load the MOFA object
+# MOFAobject <- load_model("./results/MOFA_multi-omics.hdf5")
 
 # # need to configure the environment and add mofapy2
 # reticulate::py_config()
@@ -88,9 +88,11 @@ correlate_factors_with_covariates(MOFAobject,
 
 
 correlate_factors_with_covariates(MOFAobject, 
-                                  covariates = c("Diet","Intervention","Timepoint"), 
+                                  covariates = c("Diet","Intervention","Timepoint",
+                                                 "R1AA", "R1CC", "R1MD",
+                                                 "WD2AA", "WD2CC", "WD2MD"), 
                                   plot="log_pval",
-                                  abs = T
+                                  abs = T,
 )
 
 

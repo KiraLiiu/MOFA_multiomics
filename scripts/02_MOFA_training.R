@@ -14,6 +14,8 @@ library(tidyverse) # Load the tidyverse package for data manipulation
 # rm(list = setdiff(ls(), c("metabolomics_normalized", "ptm_proteomics_normalized", "transcriptomics_normalized")))
 # gc()  # Run garbage collection to free memory
 
+source("scripts/functions/MOFA_analysis_function.R")  # Load the custom functions
+
 # Load the normalized omics datasets
 metabolomics_normalized <- read.csv("data/processed/metabolomics_normalized/metabolomics_normalized.csv", check.names = FALSE, row.names = 1)
 ptm_proteomics_normalized <- read.csv("data/processed/ptm_proteomics_normalized/ptm_clr_transformed.csv", check.names = FALSE, row.names = 1)
@@ -47,14 +49,17 @@ metabolomics_normalized <- reorder_and_fill_na(metabolomics_normalized, desired_
 ptm_proteomics_normalized <- reorder_and_fill_na(ptm_proteomics_normalized, desired_order)
 transcriptomics_normalized <- reorder_and_fill_na(transcriptomics_normalized, desired_order)
 
-# Apply function to RNA-seq (transcriptomics)
-rna_top_features <- select_high_variance_features(transcriptomics_normalized, variance_threshold = 0.8)
+# select the top features with high variance
+rna_top_features <- select_high_variance_features(transcriptomics_normalized, 
+                                                  variance_threshold = 1)
 
 # Apply function to metabolomics data
-metabolomics_top_features <- select_high_variance_features(metabolomics_normalized, variance_threshold = 0.8)
+metabolomics_top_features <- select_high_variance_features(metabolomics_normalized, 
+                                                           variance_threshold = 1)
 
 # Apply function to PTM proteomics data
-ptm_top_features <- select_high_variance_features(ptm_proteomics_normalized, variance_threshold = 0.8)
+ptm_top_features <- select_high_variance_features(ptm_proteomics_normalized, 
+                                                  variance_threshold = 1)
 
 # Combine all selected features into a list
 selected_features_list <- list(
